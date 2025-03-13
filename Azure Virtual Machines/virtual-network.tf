@@ -36,4 +36,22 @@ resource "azurerm_subnet" "snets" {
   resource_group_name  = azurerm_resource_group.rg-hub.name
   virtual_network_name = azurerm_virtual_network.vnethub[each.value.vnet_key].name
   address_prefixes     = each.value.subnet_range
+
+
+  service_endpoints = each.value.subnet_name == "snet-hub-db-01-cus" ? ["Microsoft.Storage"] : []
+
+  dynamic "delegation" {
+    for_each = each.value.subnet_name == "snet-hub-db-01-cus" ? [1] : []
+    content {
+      name = "fs"
+
+      service_delegation {
+        name = "Microsoft.DBforPostgreSQL/flexibleServers"
+        actions = [
+          "Microsoft.Network/virtualNetworks/subnets/join/action",
+        ]
+      }
+    }
+  }
+
 }

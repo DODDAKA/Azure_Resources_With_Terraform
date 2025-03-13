@@ -5,14 +5,21 @@ terraform {
       source = "hashicorp/azurerm"
       version = "4.21.1"
     }
-  }
-}
 
-provider "azurerm" {
-  features {
+    null = {
+      source = "hashicorp/null"
+      version = "3.2.3"
+    }
     
   }
 }
+
+# provider "azurerm" {
+#     subscription_id = ""
+#   features {
+    
+#   }
+# }
 
 provider "azurerm" {
   # Configuration options
@@ -30,4 +37,3 @@ provider "azurerm" {
   }
 
 }
-

@@ -1,7 +1,7 @@
 rg_name = "rg-hub"
 rg_location = "centralus"
 vnet_hub = {
-  virtual_network1 = {
+  vnet-cus-hub = {
     address_space = ["10.14.0.0/20"],
     subnets={
         GatewaySubnet={
@@ -13,7 +13,7 @@ vnet_hub = {
             snet_range = ["10.14.1.0/26"]
         }
         snet-hub-acr-01-cus={
-            snet_name = "snet-hub-acr-01-cus"
+            snet_name = "snet-hub-db-01-cus"
             snet_range = ["10.14.1.64/26"]
         }
         snet-hub-mgmt-01-cus ={
@@ -30,4 +30,13 @@ vnet_hub = {
         }
     }
   }
+}
+
+vms_hub ={
+    vm-win-cus-hub={
+      size = "Standard_F2"
+      admin_username      = "adminuser"
+      storage_account_type = "Standard_LRS"
+    }
+    
 }
