@@ -1,0 +1,2250 @@
+#################################Status of the 'Enforce password history' setting
+# Set the Enforce Password History to 6
+secedit /export /cfg C:\secpol.cfg
+(Get-Content C:\secpol.cfg) -replace "PasswordHistorySize = 0", "PasswordHistorySize = 6" | Set-Content C:\secpol.cfg
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.cfg /areas SECURITYPOLICY
+Remove-Item C:\secpol.cfg
+
+########################################Status of the Minimum Password Age setting
+# Set the Minimum Password Age to 1
+secedit /export /cfg C:\secpol.cfg
+(Get-Content C:\secpol.cfg) -replace "MinimumPasswordAge = 0", "MinimumPasswordAge = 1" | Set-Content C:\secpol.cfg
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.cfg /areas SECURITYPOLICY
+Remove-Item C:\secpol.cfg
+
+######################################Status of the 'Minimum Password Length' setting
+# Set the Minimum Password Length to 8
+secedit /export /cfg C:\secpol.cfg
+(Get-Content C:\secpol.cfg) -replace "MinimumPasswordLength = 0", "MinimumPasswordLength = 8" | Set-Content C:\secpol.cfg
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.cfg /areas SECURITYPOLICY
+Remove-Item C:\secpol.cfg
+
+#####################################Status of the 'Account Lockout Duration' setting (invalid login attempts)
+ # Set the Account Lockout Duration to 15 minutes
+secedit /export /cfg C:\secpol.cfg
+(Get-Content C:\secpol.cfg) -replace "LockoutDuration = 10", "LockoutDuration = 15" | Set-Content C:\secpol.cfg
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.cfg /areas SECURITYPOLICY
+Remove-Item C:\secpol.cfg 
+
+##########################################Status of the 'Reset Account Lockout Counter After' setting
+# Define the expected value (in minutes)
+$expectedValue = 15  # Set to 15 minutes or higher
+
+# Set the Reset Account Lockout Counter After value using secedit
+$secEditOutput = "secEditOutput.txt"
+secedit /export /cfg $secEditOutput
+
+# Update the configuration file
+(Get-Content $secEditOutput) -replace "ResetLockoutCount = \d+", "ResetLockoutCount = $expectedValue" | Set-Content $secEditOutput
+
+# Apply the updated configuration
+secedit /configure /db secedit.sdb /cfg $secEditOutput
+
+# Verify the setting
+$currentValue = (Get-Content $secEditOutput | Select-String "ResetLockoutCount = (\d+)").Matches.Groups[1].Value
+
+if ($currentValue -ge $expectedValue) {
+    Write-Host "Reset Account Lockout Counter After setting is correctly configured as $expectedValue minutes."
+} else {
+    Write-Host "Failed to configure the Reset Account Lockout Counter After setting."
+}
+
+# Clean up
+Remove-Item $secEditOutput
+
+
+##########################################Status of the local Administrator account (enabled/disabled)
+# Disable the local Administrator account
+Disable-LocalUser -Name "Administrator"
+# Verify the status of the Administrator account
+$adminStatus = Get-LocalUser -Name "Administrator"
+
+if ($adminStatus.Enabled -eq $false) {
+    Write-Host "The local Administrator account is correctly configured as Disabled."
+} else {
+    Write-Host "Failed to disable the local Administrator account."
+} 
+
+###############################################Status of the Security Options 'Accounts: Block Microsoft accounts' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "NoConnectedUser" -Value 1
+
+######################################################Status of the name of the 'Built-in Guest' account
+
+If ((Get-LocalUser -Name "Guest").Enabled) { Disable-LocalUser -Name "Guest"; Write-Host "'Built-in Guest' account has been disabled." } Else { Write-Host "'Built-in Guest' account is already disabled." }
+
+#########################################################Status of the 'Network Access: Do not allow Anonymous Enumeration of SAM Accounts and Shares' setting
+# Check if the registry path exists, if not, create it
+if (-not (Test-Path "HKLM:\System\CurrentControlSet\Control\Lsa")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\System\CurrentControlSet\Control" -Name "Lsa" -Force
+}
+
+# Set RestrictAnonymous to 2 (restrict anonymous access)
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Lsa" -Name "RestrictAnonymous" -Value 2
+
+############################################################Status of the 'Network security: Allow PKU2U authentication requests to this computer to use online identities' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\pku2u" -Name "Enabled" -Value 0
+
+############################################################# Configure 'Network Security:Configure encryption types allowed for Kerberos'
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\Kerberos\Parameters" -Name "SupportedEncryptionTypes" -Value 0x6
+
+#############################################################Status of the 'Network Security: LAN Manager Authentication Level' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "LmCompatibilityLevel" -Value 5
+
+################################################################Status of the 'User Account Control: Admin Approval Mode for the Built-in Administrator account' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "FilterAdministratorToken" -Value 1
+
+#############################################################Status of the 'User Account Control: Behavior of the elevation prompt for administrators in Admin Approval Mode' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Value 2
+
+#############################################################Status of the 'User Account Control: Behavior of the elevation prompt for standard users' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorUser" -Value 0
+
+###############################################################Status of the 'Devices: Allowed to format and eject removable media' setting (NTFS formatted devices)
+
+# Check if the registry path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" -Name "Winlogon" -Force
+}
+# Set AllocateDASD to 0 (disable DASD allocation)
+Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "AllocateDASD" -Value 0
+
+###################################################################Status of the 'Interactive Logon: Do Not Display Last User Name' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "DontDisplayLastUserName" -Value 1
+
+##################################################Status of the Security Options 'Interactive logon: Machine inactivity limit' setting (seconds)
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "InactivityTimeoutSecs" -Value 600
+
+#########################################################Status of the contents of the 'login banner' (Windows/Unix/Linux)
+
+(Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "legalnoticecaption").legalnoticecaption
+
+(Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "legalnoticetext").legalnoticetext
+
+##########################################################Status of 'logon banner title' setting (Legal Notice)
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "legalnoticecaption" -Value "Authorized Access Only"
+
+################################################Status of the 'Interactive Logon: Require Domain Controller authentication to unlock workstation' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ForceUnlockLogon" -Value 1
+
+###################################################Status of the 'Interactive Logon: Smart Card Removal Behavior' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ScRemoveOption" -Value 1
+
+###################################################Status of the 'Microsoft network client: Digitally sign communications (always)' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanManWorkstation\Parameters" -Name "EnableSecuritySignature" -Value 1
+
+#####################################################Status of the 'Microsoft network server: Digitally Sign Communications (if Client agrees) setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanManServer\Parameters" -Name "RequireSecuritySignature" -Value 1
+
+####################################################Status of the 'Microsoft network server: Server SPN target name validation level' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanManServer\Parameters" -Name "ServerSpnTargetNameValidationLevel" -Value 1
+
+################################################Status of the 'Windows Firewall: Firewall state (Domain)' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableFirewall" -Value 1
+
+##############################################Status of the 'Windows Firewall: Inbound connections (Domain)' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableInboundFirewall" -Value 1
+
+##############################################Status of the 'Windows Firewall: Outbound connections (Domain)' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableOutboundFirewall" -Value 0
+
+#############################################Status of the 'Windows Firewall: Display a notification (Domain)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+$regName = "DisableNotifications"
+$regValue = 1  # 1 = No (Disable notifications)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Display a notification (Domain)' setting has been configured."
+
+######################################################Status of the 'Windows Firewall: Log file path and name (Domain)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile\Logging"
+$regName = "LogFilePath"
+$regValue = "%SystemRoot%\System32\logfiles\firewall\domainfw.log"
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+# Force a policy update
+gpupdate /force
+Write-Output "The 'Windows Firewall: Log file path and name (Domain)' setting has been configured."
+
+##########################################################Status of the 'Windows Firewall: Log File Size (Domain)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile\Logging"
+$regName = "LogFileSize"
+$regValue = 16384  # 16384 KB = 16 MB
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue KB"
+}
+# Force a policy update
+gpupdate /force
+Write-Output "The 'Windows Firewall: Log File Size (Domain)' setting has been configured."
+
+############################################################Status of the 'Windows Firewall: Log dropped packets (Domain)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile\Logging"
+$regName = "LogDroppedPackets"
+$regValue = 1  # 1 = Yes (Enable logging of dropped packets)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log dropped packets (Domain)' setting has been configured."
+
+###############################################################Status of the 'Windows Firewall: Log Successful Connections (Domain)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile\Logging"
+$regName = "LogSuccessfulConnections"
+$regValue = 1  # 1 = Yes (Enable logging of successful connections)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log Successful Connections (Domain)' setting has been configured."
+
+#########################################################Status of the 'Windows Firewall: Firewall state (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile"
+$regName = "EnableFirewall"
+$regValue = 1  # 1 = On (Enable firewall)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Firewall state (Private)' setting has been configured."
+
+##########################################################Status of the 'Windows Firewall: Inbound connections (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile"
+$regName = "DefaultInboundAction"
+$regValue = 1  # 1 = Block (Block inbound connections)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Inbound connections (Private)' setting has been configured."
+
+#########################################################Status of the 'Windows Firewall: Outbound connections (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile"
+$regName = "DefaultOutboundAction"
+$regValue = 0  # 0 = Allow (Allow outbound connections)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Outbound connections (Private)' setting has been configured."
+
+#######################################################Status of the 'Windows Firewall: Display a notification (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile"
+$regName = "DisableNotifications"
+$regValue = 1  # 1 = No (Disable notifications)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Display a notification (Private)' setting has been configured."
+
+###################################################Status of the 'Windows Firewall: Log file path and name (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile\Logging"
+$regName = "LogFilePath"
+$regValue = "%SystemRoot%\System32\logfiles\firewall\privatefw.log"
+ 
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+ 
+# Set the registry value
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Type String
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log file path and name (Private)' setting has been configured."
+
+##############################################################Status of the 'Windows Firewall: Log File Size (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile\Logging"
+$regName = "LogFileSize"
+$regValue = 16384  # 16384 KB = 16 MB
+ 
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+ 
+# Set the registry value
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Type DWord
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue KB"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log File Size (Private)' setting has been configured."
+
+###########################################################Status of the 'Windows Firewall: Log dropped packets (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile\Logging"
+$regName = "LogDroppedPackets"
+$regValue = 1  # 1 = Yes (Enable logging of dropped packets)
+ 
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+ 
+# Set the registry value
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Type DWord
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log dropped packets (Private)' setting has been configured."
+
+###################################################################Status of the 'Windows Firewall: Log Successful Connections (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile\Logging"
+$regName = "LogSuccessfulConnections"
+$regValue = 1  # 1 = Yes (Enable logging of successful connections)
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+ 
+# Set the registry value
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Type DWord
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log Successful Connections (Private)' setting has been configured."
+
+#################################################################Status of the 'Windows Firewall: Log Successful Connections (Private)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PrivateProfile\Logging"
+$regName = "LogSuccessfulConnections"
+$regValue = 1  # 1 = Yes (Enable logging of successful connections)
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+ 
+# Set the registry value
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Type DWord
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log Successful Connections (Private)' setting has been configured."
+
+#######################################################Status of the 'Windows Firewall: Firewall state (Public)' setting
+
+Status of the 'Windows Firewall: Firewall state (Public)' setting
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+$regName = "EnableFirewall"
+$regValue = 1  # 1 = On (Enable firewall)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Firewall state (Public)' setting has been configured."
+
+#####################################################Status of the 'Windows Firewall: Log Successful Connections (Public)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile\Logging"
+$regName = "LogSuccessfulConnections"
+$regValue = 1  # 1 = Yes (Enable logging of successful connections)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Log Successful Connections (Public)' setting has been configured."
+
+##########################################################Status of the 'Windows Firewall: Inbound connections (Public)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+$regName = "DefaultInboundAction"
+$regValue = 1  # 1 = Block (Block inbound connections)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Inbound connections (Public)' setting has been configured."
+
+
+#####################################################Status of the 'Windows Firewall: Outbound connections (Public)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+$regName = "DefaultOutboundAction"
+$regValue = 0  # 0 = Allow (Allow outbound connections)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Outbound connections (Public)' setting has been configured."
+
+####################################################Status of the 'Windows Firewall: Display a notification (Public)' setting
+
+# Define the registry path and value
+$regPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+$regName = "DisableNotifications"
+$regValue = 1  # 1 = No (Disable notifications)
+ 
+# Create or update the registry key
+if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force
+}
+Set-ItemProperty -Path $regPath -Name $regName -Value $regValue
+ 
+# Verify the registry key
+$currentValue = (Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue).$regName
+if ($null -eq $currentValue) {
+    Write-Output "Registry key '$regName' was not found or could not be created."
+} else {
+    Write-Output "Current value of '$regName': $currentValue"
+}
+ 
+# Force a policy update
+gpupdate /force
+ 
+Write-Output "The 'Windows Firewall: Display a notification (Public)' setting has been configured."
+
+#######################################################Status of the 'Windows Firewall: Apply local firewall rules (Public)' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+$registryKey = "AllowLocalPolicyMerge"
+$expectedValue = 0
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Windows Firewall: Apply local firewall rules (Public) setting is correctly configured as No (0)."
+} else {
+    Write-Host "Failed to configure the Windows Firewall: Apply local firewall rules (Public) setting."
+}
+
+######################################################Status of the 'Windows Firewall: Apply local connection security rules (Public)' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+$registryKey = "AllowLocalIPsecPolicyMerge"
+$expectedValue = 0
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Windows Firewall: Apply local connection security rules (Public) setting is correctly configured as No (0)."
+} else {
+    Write-Host "Failed to configure the Windows Firewall: Apply local connection security rules (Public) setting."
+}
+
+######################################################Status of the 'Windows Firewall: Log file path and name (Public)' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile\Logging"
+$registryKey = "LogFilePath"
+$expectedValue = "%SystemRoot%\System32\logfiles\firewall\publicfw.log"
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type ExpandString -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Windows Firewall: Log file path and name (Public) setting is correctly configured as '$expectedValue'."
+} else {
+    Write-Host "Failed to configure the Windows Firewall: Log file path and name (Public) setting."
+}
+
+#####################################################Status of the 'Windows Firewall: Log File Size (Public)' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile\Logging"
+$registryKey = "LogFileSize"
+$expectedValue = 16384  # Set the log file size to 16384 KB (16 MB)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -ge $expectedValue) {
+    Write-Host "Windows Firewall: Log File Size (Public) setting is correctly configured as $expectedValue KB."
+} else {
+    Write-Host "Failed to configure the Windows Firewall: Log File Size (Public) setting."
+}
+
+#######################################################Status of the 'Windows Firewall: Log dropped packets (Public)' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile\Logging"
+$registryKey = "LogDroppedPackets"
+$expectedValue = 1  # Set to Yes (1)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Windows Firewall: Log dropped packets (Public) setting is correctly configured as Yes (1)."
+} else {
+    Write-Host "Failed to configure the Windows Firewall: Log dropped packets (Public) setting."
+} 
+
+####################################################Status of the 'Lock screen camera' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization" -Name NoLockScreenCamera -Value 0
+
+#########################################Status of the 'Lock screen slide show' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization" -Name NoLockScreenSlideshow -Value 1
+
+###################################################Status of the 'Allow Input Personalization' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\TabletPC" -Name AllowInputPersonalization -Value 0
+
+####################################################Status of the 'Do not allow password expiration time longer than required by policy' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "MaximumPasswordAge" -Value 90
+
+#############################################################Status of the 'Apply UAC restrictions to local accounts on network logons' settings
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "LocalAccountNetworkRestricted" -Value 1
+
+############################################################Status of the 'SMB v1' protocol for LanManServer services on Windows
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanManServer\Parameters" -Name "SMB1" -Value 0
+
+###########################################################Status of the 'NetBIOS node type' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" -Name "NodeType" -Value 2
+
+###########################################################Status of the 'WDigest Authentication' setting
+
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Lsa" -Name "UseLogonCredential" -Value 0
+
+##################################################Status of the 'MSS: (AutoAdminLogon) Enable Automatic Logon (not recommended)' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "AutoAdminLogon" -Value "0"
+
+##################################################Status of the 'MSS: (WarningLevel) Percentage threshold for the security event log at which the system will generate a warning' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\EventLog\Security" -Name "WarningLevel" -Value 80
+
+################################################Status of the 'MSS: (DisableIPSourceRoutingIPv6) IP source routing protection level (protects against packet spoofing)' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters" -Name "DisableIPSourceRoutingIPv6" -Value 1
+
+####################################################Status of the 'MSS: Allow ICMP redirects to override OSPF generated routes (EnableICMPRedirect)' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" -Name "EnableICMPRedirect" -Value 0
+
+########################################################Status of the 'MSS: (NoNameReleaseOnDemand) Allow the computer to ignore NetBIOS name release requests except from the 'WINS servers' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NetBT\Parameters" -Name "NoNameReleaseOnDemand" -Value 1
+
+#######################################################Status of the 'MSS: (SafeDllSearchMode) Enable Safe DLL search mode (recommended)' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options" -Name "SafeDllSearchMode" -Value 1
+
+####################################################Status of the 'MSS: (ScreenSaverGracePeriod) The time in seconds before the screen saver grace period expires' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ScreenSaverGracePeriod" -Value 240
+
+#####################################################Status of the 'Prohibit installation and configuration of Network Bridge on the DNS domain network' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Network Connections" -Name "NC_AllowNetBridge" -Value 1
+
+#######################################################Status of the 'Prohibit use of Internet Connection Sharing on your DNS domain network' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Network Connections" -Name "NC_ShowSharedAccessUI" -Value 0
+
+########################################################Status of the 'Require domain users to elevate when setting a network's location' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WcmSvc\GroupPolicy" -Name "fMinimizeConnections" -Value 1
+
+############################################################Configure 'Minimize the number of simultaneous connections to the Internet or a Windows Domain'
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WcmSvc\GroupPolicy" -Name "fMinimizeConnections" -Value 1
+
+##################################################Status of the 'Turn off multicast name resolution' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient" -Name "EnableMulticast" -Value 0
+
+########################################Status of the 'Enable insecure guest logons' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation" -Name "AllowInsecureGuestAuth" -Value 0
+
+###################################################Status of the 'Boot-Start Driver Initialization Policy' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Policies\EarlyLaunch" -Name "DriverLoadPolicy" -Value 3
+
+#########################################################Status of the 'Boot-Start Driver Initialization Policy' setting
+
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Policies\EarlyLaunch" -Name "DriverLoadPolicy" -Value 3
+
+#######################################################Status of the 'Registry policy processing (Option: Do not apply during periodic background processing)' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\Group Policy\{35378EAC-683F-11D2-A89A-00C04FBBCFA2}"
+$registryKey = "NoBackgroundPolicy"
+$expectedValue = 0
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Registry policy processing setting is correctly configured as Disabled (0)."
+} else {
+    Write-Host "Failed to configure the registry policy processing setting."
+}
+
+################################################################Status of the 'Registry policy processing option: Process even if the Group Policy objects have not changed' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\Group Policy\{35378EAC-683F-11D2-A89A-00C04FBBCFA2}"
+$registryKey = "NoGPOListChanges"
+$expectedValue = 0
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Registry policy processing setting is correctly configured as Enabled (0)."
+} else {
+    Write-Host "Failed to configure the registry policy processing setting."
+}
+
+#############################################Status of the 'Continue experiences on this device' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\System" -Name "EnableCdp" -Value 0
+
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"
+$registryKey = "EnableCdp"
+$expectedValue = 0
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Continue experiences on this device setting is correctly configured as Disabled (0)."
+} else {
+    Write-Host "Failed to configure the Continue experiences on this device setting."
+}
+
+###################################################Status of the 'Turn off downloading of print drivers over HTTP' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows NT\Printers"
+$registryKey = "DisableWebPnPDownload"
+$expectedValue = 1  # Set to Enabled (1)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Turn off downloading of print drivers over HTTP setting is correctly configured as Enabled (1)."
+} else {
+    Write-Host "Failed to configure the Turn off downloading of print drivers over HTTP setting."
+} 
+
+################################Status of 'Manage preview builds' group policy
+
+ # Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate"
+$registryKey = "ManagePreviewBuilds"
+$expectedValue = 1  # Set to Enabled (1)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Manage preview builds group policy is correctly configured as Enabled (1)."
+} else {
+    Write-Host "Failed to configure the Manage preview builds group policy."
+} 
+
+############################################Status of the 'Select when Feature Updates are received - DeferFeatureUpdates' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+$registryKey = "DeferFeatureUpdates"
+$expectedValue = 1  # Set to Enabled (1)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "DeferFeatureUpdates setting is correctly configured as Enabled (1)."
+} else {
+    Write-Host "Failed to configure the DeferFeatureUpdates setting."
+} 
+
+####################################################Status of the 'Select when Quality Updates are received' 'DeferQualityUpdates' setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+$registryKey = "DeferQualityUpdates"
+$expectedValue = 1  # Set to Enabled (1)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "DeferQualityUpdates setting is correctly configured as Enabled (1)."
+} else {
+    Write-Host "Failed to configure the DeferQualityUpdates setting."
+} 
+
+##################################################Status of the 'Configure Automatic Updates Option: Scheduled install day' policy setting
+
+# Define the registry path and value
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU"
+$valueName = "ScheduledInstallDay"
+$valueData = 0  # 0 = Every day
+# Check if the registry path exists, and create it if it doesn't
+if (-not (Test-Path -Path $registryPath)) {
+    New-Item -Path $registryPath -Force
+    Write-Host "Created registry path: $registryPath"
+}
+# Set the registry value
+Set-ItemProperty -Path $registryPath -Name $valueName -Value $valueData
+Write-Host "Set $valueName to $valueData (Every day)."
+
+#################################################Status of the 'Allow Telemetry' setting
+
+Set-ItemProperty -Path"HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0
+
+##########################################Status of 'Toggle user control over Insider builds'
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PreviewBuilds" -Name "AllowBuildPreview" -Value 0
+
+####################################################Status of the 'Microsoft network server: Digitally sign communication (always)' setting (SMB)
+
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Services\LanmanServer\Parameters" -Name "RequireSecuritySignature" -Value 1
+
+########################################################Status of the 'Block all consumer Microsoft account user authentication' (DisableUserAuth) Group Policy setting
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftAccount")) {
+    # Create the MicrosoftAccount registry key
+    New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft" -Name "MicrosoftAccount" -Force
+}
+# Now set the DisableUserAuth value
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftAccount" -Name "DisableUserAuth" -Value 1
+
+
+########################################################Status of the 'Prevent the usage of OneDrive for file storage' (Skydrive) group policy setting
+
+# Check if the OneDrive registry path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\OneDrive")) {
+    # Create the OneDrive registry key path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows" -Name "OneDrive" -Force
+}
+# Now set the DisableFileSyncNGSC value to 1 (disable OneDrive NGSC syncing)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\OneDrive" -Name "DisableFileSyncNGSC" -Value 1
+
+
+############################################################Status of the 'Do not allow passwords to be saved' setting (Terminal Services)
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows NT\Terminal Services" -Name "DisablePasswordSaving" -Value 1
+
+######################################Status of the 'Do not delete temp folder upon exit' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "DeleteTempDirsOnExit" -Value 0
+
+#############################################Status of the 'Do not use temporary folders per session' Group Policy setting
+
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services"
+$registryKey = "PerSessionTempDir"
+$expectedValue = 1  # Set to Disabled (1)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Do not use temporary folders per session setting is correctly configured as Disabled (1)."
+} else {
+    Write-Host "Failed to configure the Do not use temporary folders per session setting."
+} 
+
+###############################################Status of the 'Do not allow drive redirection' setting (Terminal Services)
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "fDisableCdm" -Value 1
+
+##############################################Status of the 'Always prompt for password upon connection' setting (Terminal Services)
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "fPromptForPassword" -Value 1
+
+##################################################Status of the 'Require secure RPC communication' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "fEncryptRPCTraffic" -Value 1
+
+######################################################Status of the 'Require use of specific security layer for remote (RDP) connections' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "SecurityLayer" -Value 2
+
+##############################################Status of the 'Require user authentication for remote connections by using Network Level Authentication' setting
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "UserAuthentication" -Value 1
+
+###################################Status of the 'Set Client Connection Encryption Level' setting (Terminal Services)
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "MinEncryptionLevel" -Value 3
+
+##########################################Status of the 'Allow Microsoft accounts to be optional' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "MSAOptional" -Value 1
+
+#######################Status of the 'Turn off downloading of enclosures' setting (Internet Explorer)
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Internet Explorer\Feeds")) {
+    # Create the Feeds registry key path
+    New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Internet Explorer" -Name "Feeds" -Force
+}
+# Now set the DisableEnclosureDownload value to 1 (disable enclosure download)
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Internet Explorer\Feeds" -Name "DisableEnclosureDownload" -Value 1
+
+
+#######################################Status of the 'Allow indexing of encrypted files' setting
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search")) {
+    # Create the Windows Search registry key path
+    New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows" -Name "Windows Search" -Force
+}
+# Now set the AllowIndexingEncryptedStoresOrItems value to 0 (allow indexing encrypted items)
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search" -Name "AllowIndexingEncryptedStoresOrItems" -Value 0
+
+
+#################################Status of 'Scan removable drives (Windows Defender)' setting
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Scan")) {
+    # Create the Scan registry key path
+    New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" -Name "Scan" -Force
+}
+# Now set the DisableRemovableDriveScanning value to 0 (enable removable drive scanning)
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Scan" -Name "DisableRemovableDriveScanning" -Value 0
+
+
+#########################Status of 'Windows Defender - Turn on e-mail scanning' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows Defender\Scan" -Name "DisableEmailScanning" -Value 0
+
+##################################Status of 'Attack Surface Reduction' group policy
+
+ # Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR"
+$registryKey = "ExploitGuard_ASR_Rules"
+$expectedValue = 1  # Set to Enabled (1)
+
+# Create the registry path if it doesn't exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord -Force
+
+# Verify the setting
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+
+if ($currentValue -and $currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "Attack Surface Reduction (ASR) group policy is correctly configured as Enabled (1)."
+} else {
+    Write-Host "Failed to configure the Attack Surface Reduction (ASR) group policy."
+} 
+
+
+#########################Status of Office communication application from creating child processes (26190899-1602-49e8-8b27-eb1d0a1ce869)
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules")) {
+    # Create the ASR Rules registry key path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR" -Name "Rules" -Force
+}
+# Now set the specific ASR rule to 0 (enable the rule)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules" -Name "26190899-1602-49e8-8b27-eb1d0a1ce869" -Value 0
+
+
+##################################Status of 'Prevent users and apps from accessing dangerous websites' setting
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard" -Name "Network Protection" -Force
+}
+# Now set EnableNetworkProtection to 1 (enable Network Protection)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection" -Name "EnableNetworkProtection" -Value 1
+
+
+########################################Status of the 'Configure detection for potentially unwanted applications' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows Defender" -Name "PUAProtection" -Value 1
+
+###############Status of the 'Disallow Autoplay for non-volume devices' setting##
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\Explorer" -Name "NoAutoplayfornonVolume" -Value 1
+
+#############################Status of the 'default behavior for AutoRun'
+
+Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoAutorun" -Value 1
+
+###########################Status of the 'Disable Autorun for all drives' setting for the HKLM key
+
+Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoDriveTypeAutoRun" -Value 255
+
+#####################################Status of the 'Configure Windows Defender SmartScreen' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\System" -Name "EnableSmartScreen" -Value 1
+
+#######################################Status of the 'Turn on PowerShell Script Block Logging' setting
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell" -Name "ScriptBlockLogging" -Force
+}
+# Now set EnableScriptBlockLogging to 0 (enable script block logging)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" -Name "EnableScriptBlockLogging" -Value 0
+
+
+#############################################Status of the 'Turn on PowerShell Transcription' setting
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\Transcription")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell" -Name "Transcription" -Force
+}
+# Now set EnableTranscripting to 0 (enable PowerShell transcription)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\PowerShell\Transcription" -Name "EnableTranscripting" -Value 0
+
+
+################################################Status of the 'Disallow Digest authentication' setting (WinRM client)
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\WinRM\Client")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\WinRM" -Name "Client" -Force
+}
+# Now set AllowDigest to 0 (disable Digest Authentication)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WinRM\Client" -Name "AllowDigest" -Value 0
+
+
+#####################################Status of the 'Disallow WinRM from storing RunAs credentials' setting (WinRM service)
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\WinRM\Service")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\WinRM" -Name "Service" -Force
+}
+# Now set DisableRunAs to 1 (disable the RunAs command)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WinRM\Service" -Name "DisableRunAs" -Value 1
+
+
+#####################################Status of the 'Prevent users from modifying settings' setting for Windows Defender Exploit Protection
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows Defender Security Center\App and Browser protection")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows Defender Security Center" -Name "App and Browser protection" -Force
+}
+# Now set DisallowExploitProtectionOverride to 1 (disallow overrides)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows Defender Security Center\App and Browser protection" -Name "DisallowExploitProtectionOverride" -Value 1
+
+####################################Status of "Password protect the screen saver" setting for Windows users
+
+# Check if the registry path exists; if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\Control Panel\Desktop")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\Control Panel" -Name "Desktop" -Force
+}
+# Set ScreenSaverIsSecure to 1 (require password after screensaver)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\Control Panel\Desktop" -Name "ScreenSaverIsSecure" -Value 1
+
+
+######################################Status of the "Screen saver timeout" [ScreenSaveTimeOut] setting
+
+# Check if the registry path exists; if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\Control Panel\Desktop")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\Control Panel" -Name "Desktop" -Force
+}
+# Set ScreenSaveTimeOut to 300 seconds (5 minutes)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\Control Panel\Desktop" -Name "ScreenSaveTimeOut" -Value 300
+
+
+####################################Status of the 'Turn off toast notifications on the lock screen' setting
+
+# Check if the registry path exists; if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\PushNotifications")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion" -Name "PushNotifications" -Force
+}
+# Set NoToastApplicationNotificationOnLockScreen to 1 (disable notifications on lock screen)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\CurrentVersion\PushNotifications" -Name "NoToastApplicationNotificationOnLockScreen" -Value 1
+
+###################################Status of the 'Prevent users from sharing files within their profile' setting
+
+# Check if the registry path exists; if not, create it
+if (-not (Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies" -Name "Explorer" -Force
+}
+# Set NoInplaceSharing to 1 (disable in-place sharing)
+Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoInplaceSharing" -Value 1
+
+#######################################Status of the "Do not preserve zone information in file attachments" setting for Windows users
+
+# Check if the registry path exists; if not, create it
+if (-not (Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Attachments")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies" -Name "Attachments" -Force
+}
+# Set SaveZoneInformation to 1 (enable saving zone information for attachments)
+Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Attachments" -Name "SaveZoneInformation" -Value 1
+
+#######################################Status of the 'Notify antivirus programs when opening attachments' configuration [For Windows user]
+
+# Check if the registry path exists; if not, create it
+if (-not (Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Attachments")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies" -Name "Attachments" -Force
+}
+# Set ScanWithAntiVirus to 1 (enable scanning of attachments with antivirus)
+Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Attachments" -Name "ScanWithAntiVirus" -Value 1
+
+###################################Status of the 'Always install with elevated privileges' setting for Windows User
+
+# Check if the registry path exists; if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\Installer")) {
+    # Create the registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft\Windows" -Name "Installer" -Force
+}
+# Set AlwaysInstallElevated to 0 (disable it)
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\Installer" -Name "AlwaysInstallElevated" -Value 0
+
+
+########################################Status of the 'Configure Windows spotlight on Lock Screen' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\CloudContent" -Name "ConfigureWindowsSpotlight" -Value 0
+
+########################################Status of the 'Do not suggest third-party content in Windows spotlight' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\CloudContent" -Name "DisableThirdPartySuggestions" -Value 1
+
+#######################################Status of the 'Local Admin Password Management' setting
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft Services\AdmPwd" -Name "AdmPwdEnabled" -Value 1
+
+#######################################Status of the 'Password Complexity' Local Administrator Password Solution (LAPS)
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft Services\AdmPwd" -Name "PasswordComplexity" -Value 1
+
+###############################Status of the 'Password Length' Local Administrator Password Solution (LAPS)
+
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft Services\AdmPwd" -Name "PasswordLength" -Value 16
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft Services\AdmPwd")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft Services" -Name "AdmPwd" -Force
+}
+# Now set PasswordLength to 16 characters
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft Services\AdmPwd" -Name "PasswordLength" -Value 16
+
+
+#############################################Status of the 'Password Age' Local Administrator Password Solution (LAPS)
+
+# Check if the path exists, if not, create it
+if (-not (Test-Path "HKLM:\Software\Policies\Microsoft Services\AdmPwd")) {
+    # Create the necessary registry path
+    New-Item -Path "HKLM:\Software\Policies\Microsoft Services" -Name "AdmPwd" -Force
+}
+# Now set PasswordAgeDays to 30
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft Services\AdmPwd" -Name "PasswordAgeDays" -Value 30
+
+
+####################################Status of the 'Turn off picture password sign-in' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\System"
+$registryKey = "BlockDomainPicturePassword"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+################################Status of the Configure 'Turn off app notifications on the lock screen'
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\System"
+$registryKey = "DisableLockScreenAppNotifications"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+#########################################Status of the 'Do not enumerate connected users on domain-joined computers' setting
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\System"
+$registryKey = "DontEnumerateConnectedUsers"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+
+##################################################Status of the 'Do not display network selection UI' setting
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\System"
+$registryKey = "DontDisplayNetworkSelectionUI"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+
+#########################################Status of the 'Block user from showing account details on sign-in' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"
+$registryKey = "BlockUserFromShowingAccountDetailsOnSignin"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+########################################################### Status of the 'Enumeration policy for external devices incompatible with Kernel DMA Protection' setting
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\Kernel DMA Protection"
+$registryKey = "DeviceEnumerationPolicy"
+$expectedValue = 0  # 0 = Block all
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Block all)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+######################################################Status of the 'Turn off Internet download for Web publishing and online ordering wizards' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+$registryKey = "NoWebServices"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry key exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+############################################################Current list of Groups and User Accounts granted the 'Allow log on locally (SeInteractiveLogonRight)' right
+# Define the policy and expected group
+$policy = "SeInteractiveLogonRight"
+$expectedGroup = "Administrators"
+ 
+# Export the current security policy to a temporary file
+$seceditPath = "$env:TEMP\secpol.inf"
+secedit /export /cfg $seceditPath
+ 
+# Read the exported file
+$secpolContent = Get-Content $seceditPath
+ 
+# Check if the policy is already assigned only to the expected group
+if ($secpolContent -match "$policy\s*=\s*$expectedGroup(,\s*[^,]+)*") {
+    Write-Host "The '$policy' right is already correctly assigned to the '$expectedGroup' group."
+} else {
+    # Modify the policy to assign only the expected group
+    $secpolContent = $secpolContent -replace "($policy\s*=.*)", "$policy = $expectedGroup"
+    $secpolContent | Set-Content $seceditPath
+ 
+    # Import the modified policy back into the system
+    secedit /configure /db "$env:TEMP\secedit.sdb" /cfg $seceditPath
+ 
+    Write-Host "The '$policy' right has been updated to include only the '$expectedGroup' group."
+}
+
+############################################################## Current list of Groups and User Accounts granted the 'Restore files and directories (SeRestorePrivilege)' right
+ 
+# Define the policy and expected group
+$policy = "SeRestorePrivilege"
+$expectedGroup = "Administrators"
+ 
+# Export the current security policy to a temporary file
+$seceditPath = "$env:TEMP\secpol.inf"
+secedit /export /cfg $seceditPath
+ 
+# Read the exported file
+$secpolContent = Get-Content $seceditPath
+ 
+# Check if the policy is already assigned only to the expected group
+if ($secpolContent -match "$policy\s*=\s*$expectedGroup(,\s*[^,]+)*") {
+    Write-Host "The '$policy' right is already correctly assigned to the '$expectedGroup' group."
+} else {
+    # Modify the policy to assign only the expected group
+    $secpolContent = $secpolContent -replace "($policy\s*=.*)", "$policy = $expectedGroup"
+    $secpolContent | Set-Content $seceditPath
+ 
+    # Import the modified policy back into the system
+    secedit /configure /db "$env:TEMP\secedit.sdb" /cfg $seceditPath
+ 
+    Write-Host "The '$policy' right has been updated to include only the '$expectedGroup' group."
+}
+
+################################################## Status of the 'Turn off Microsoft consumer experiences' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\CloudContent"
+$registryKey = "DisableWindowsConsumerFeatures"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+######################################################Status of the 'Use enhanced anti-spoofing when available' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Biometrics\FacialFeatures"
+$registryKey = "EnhancedAntiSpoofing"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+########################################################Status of the 'Remote host allows delegation of non-exportable credentials' (AllowProtectedCreds) setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation"
+$registryKey = "AllowProtectedCreds"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+######################################################### Status of the 'Encryption Oracle Remediation' group policy
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System\CredSSP\Parameters"
+$registryKey = "AllowEncryptionOracle"
+$expectedValue = 0  # 0 = Forced Updated Clients
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Forced Updated Clients)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+
+######################################################Status of the 'RPC Endpoint Mapper Client Authentication' setting
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows NT\Rpc"
+$registryKey = "EnableAuthEpResolution"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+####################################################Status of the 'Solicited Remote Assistance' policy setting (Terminal Services)
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows NT\Terminal Services"
+$registryKey = "fAllowToGetHelp"
+$expectedValue = 0  # 0 = Disabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Disabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+#############################################Current list of Groups and User Accounts granted the 'Back up files and directories' right
+
+# Define the expected security principal for backup privilege 
+
+$authorizedGroup = "BUILTIN\Administrators" 
+
+# Export current security policy 
+
+secedit /export /cfg C:\secpol.inf 
+
+# Modify the backup privilege entry 
+
+$secpolContent = Get-Content C:\secpol.inf 
+
+# Remove "Backup Operators" and keep only "Administrators" 
+
+$updatedContent = $secpolContent -replace 'SeBackupPrivilege\s*=\s*\*?.*', "SeBackupPrivilege = $authorizedGroup" 
+
+# Handle case where the entry might not exist 
+
+if ($updatedContent -notcontains "SeBackupPrivilege = $authorizedGroup") { 
+
+    $updatedContent += "`r`n[Privilege Rights]`r`nSeBackupPrivilege = $authorizedGroup" 
+
+} 
+
+Set-Content -Path C:\secpol.inf -Value $updatedContent 
+
+# Apply modified policy 
+
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.inf /areas USER_RIGHTS 
+
+
+# Force policy update 
+
+gpupdate /force 
+
+# Cleanup 
+
+Remove-Item C:\secpol.inf 
+
+# Verify results (using auditpol) 
+
+$currentRights = auditpol /get /subcategory:"File System" /r | ConvertFrom-Csv | Where-Object { $_.Subcategory -eq "File System" } | Select-Object -ExpandProperty "Inclusion Setting" 
+ 
+Write-Output "Current backup privileges: $currentRights" 
+
+#############################################################Current list of Groups and User Accounts granted the 'Deny logon as a batch job' right
+
+# Define the expected security principal for "Deny logon as a batch job" 
+$expectedPrincipal = "Guests" 
+ 
+# Export current security policy 
+secedit /export /cfg C:\secpol.inf 
+ 
+# Modify the "Deny logon as a batch job" entry 
+$secpolContent = Get-Content C:\secpol.inf 
+ 
+# Update or add the "SeDenyBatchLogonRight" entry 
+if ($secpolContent -match 'SeDenyBatchLogonRight\s*=\s*\*?.*') { 
+    # Update existing entry 
+    $secpolContent = $secpolContent -replace 'SeDenyBatchLogonRight\s*=\s*\*?.*', "SeDenyBatchLogonRight = $expectedPrincipal" 
+} else { 
+    # Add new entry if it doesn't exist 
+    $secpolContent += "`r`n[Privilege Rights]`r`nSeDenyBatchLogonRight = $expectedPrincipal" 
+} 
+ 
+Set-Content -Path C:\secpol.inf -Value $secpolContent 
+ 
+# Apply modified policy 
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.inf /areas USER_RIGHTS 
+ 
+# Force policy update 
+gpupdate /force 
+ 
+# Verify results 
+$currentRights = (Get-Content C:\secpol.inf | Select-String "SeDenyBatchLogonRight").ToString().Split("=")[1].Trim() 
+Write-Output "Current 'Deny logon as a batch job' rights: $currentRights" 
+ 
+# Cleanup 
+Remove-Item C:\secpol.inf 
+
+###########################################################################Current list of Groups and User Accounts granted the 'Access this computer from the network' right
+
+# Define the expected security principals for "Access this computer from the network" 
+$expectedPrincipals = @("Administrators", "Authenticated Users") 
+ 
+# Export current security policy 
+secedit /export /cfg C:\secpol.inf 
+ 
+# Modify the "Access this computer from the network" entry 
+$secpolContent = Get-Content C:\secpol.inf 
+ 
+# Update or add the "SeNetworkLogonRight" entry 
+if ($secpolContent -match 'SeNetworkLogonRight\s*=\s*\*?.*') { 
+    # Update existing entry 
+    $secpolContent = $secpolContent -replace 'SeNetworkLogonRight\s*=\s*\*?.*', "SeNetworkLogonRight = $($expectedPrincipals -join ',')" 
+} else { 
+    # Add new entry if it doesn't exist 
+    $secpolContent += "`r`n[Privilege Rights]`r`nSeNetworkLogonRight = $($expectedPrincipals -join ',')" 
+} 
+ 
+# Save the modified content 
+Set-Content -Path C:\secpol.inf -Value $secpolContent 
+ 
+# Apply modified policy 
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.inf /areas USER_RIGHTS 
+ 
+# Force policy update 
+gpupdate /force 
+ 
+# Verify results 
+$currentRights = (Get-Content C:\secpol.inf | Select-String "SeNetworkLogonRight") 
+if ($currentRights) { 
+    $currentRights = $currentRights.ToString().Split("=")[1].Trim() 
+} else { 
+    $currentRights = "No entry found (policy is not configured)." 
+} 
+Write-Output "Current 'Access this computer from the network' rights: $currentRights" 
+ 
+# Cleanup 
+Remove-Item C:\secpol.inf 
+
+########################################################Status of the 'Turn off heap termination on corruption' setting
+
+
+# Set the registry path and value
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer"
+$registryName = "NoHeapTerminationOnCorruption"
+$registryValue = 0
+# Check if the registry path exists, if not create it
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+# Set the registry value
+Set-ItemProperty -Path $registryPath -Name $registryName -Value $registryValue
+
+# Verify the value was set correctly
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryName -ErrorAction SilentlyContinue
+if ($currentValue.$registryName -eq $registryValue) {
+    Write-Output "The 'Turn off heap termination on corruption' setting has been successfully set to Disabled (0)."
+} else {
+    Write-Output "Failed to set the registry value. Please check permissions or try running the script as an administrator."
+}
+
+######################################################################### Status of the 'Require pin for pairing' Enabled 'First Time OR Always' setting
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Connect"
+$registryKey = "RequirePinForPairing"
+$expectedValue = 1  # 1 = First Time; 2 = Always
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue'."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+################################################################# Status of the 'Turn off Microsoft consumer experiences' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\CloudContent"
+$registryKey = "DisableWindowsConsumerFeatures"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+#################################################################Status of "Do not display the password reveal button"
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\CredUI"
+$registryKey = "DisablePasswordReveal"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+###################################################Status of the 'Do not show feedback notifications' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\DataCollection"
+$registryKey = "DoNotShowFeedbackNotifications"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+###################################################Status of the 'Application: Maximum log size' setting (in KB)
+ 
+# Define the registry path, key, and expected minimum value
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\EventLog\Application"
+$registryKey = "MaxSize"
+$expectedMinValue = 32768  # 32768 KB = 32 MB
+ 
+# Create the registry path if it does not exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the minimum expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedMinValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -ge $expectedMinValue) {
+    Write-Host "The '$registryKey' registry key is set to '$($currentValue.$registryKey)' KB (meets or exceeds $expectedMinValue KB)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+#########################################################Status of the 'Security: Maximum log size' setting (in KB)
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\EventLog\Security"
+$registryKey = "MaxSize"
+$expectedMinValue = 196608  # 196608 KB = 192 MB
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedMinValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -ge $expectedMinValue) {
+    Write-Host "The '$registryKey' registry key is set to '$($currentValue.$registryKey)' KB (meets or exceeds $expectedMinValue KB)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+#########################################Status of the 'Setup: Maximum Log Size (KB)' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\EventLog\Setup"
+$registryKey = "MaxSize"
+$expectedMinValue = 32768  # 32768 KB = 32 MB
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedMinValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -ge $expectedMinValue) {
+    Write-Host "The '$registryKey' registry key is set to '$($currentValue.$registryKey)' KB (meets or exceeds $expectedMinValue KB)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+##########################################Status of the 'System: Maximum log size' setting (in KB)
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\EventLog\System"
+$registryKey = "MaxSize"
+$expectedMinValue = 32768  # 32768 KB = 32 MB
+ 
+# Create the registry path if it does not exist
+if (-not (Test-Path $registryPath)) {
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the minimum expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedMinValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -ge $expectedMinValue) {
+    Write-Host "The '$registryKey' registry key is set to '$($currentValue.$registryKey)' KB (meets or exceeds $expectedMinValue KB)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+
+################################################Status of the 'Turn off Data Execution Prevention for Explorer' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\Software\Policies\Microsoft\Windows\Explorer"
+$registryKey = "NoDataExecutionPrevention"
+$expectedValue = 0  # 0 = Disabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Disabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+
+############################################################Status of the 'Allow Windows Ink Workspace' setting
+ 
+# Define the registry path and key
+$registryPath = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsInkWorkspace"
+$registryKey = "AllowWindowsInkWorkspace"
+$expectedValue = 0  # 0 = Disabled; 1 = On, but disallow access above lock
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type DWord
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue'."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+##########################################################Status of "Enable screen saver" configuration for Windows users
+ 
+# Define the registry path and key
+$registryPath = "HKCU:\Software\Policies\Microsoft\Windows\Control Panel\Desktop"
+$registryKey = "ScreenSaveActive"
+$expectedValue = 1  # 1 = Enabled
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the expected value
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $expectedValue -Type String
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $expectedValue) {
+    Write-Host "The '$registryKey' registry key has been set to '$expectedValue' (Enabled)."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+
+##############################################Status of the 'Force specific screen saver:Screen saver executable name' Setting [Windows users]
+ 
+# Define the registry path, key, and valid screensaver executable
+$registryPath = "HKCU:\Software\Policies\Microsoft\Windows\Control Panel\Desktop"
+$registryKey = "SCRNSAVE.EXE"
+$validScreensaverPath = "C:\Windows\System32\scrnsave.scr"  # Default system screensaver
+ 
+# Check if the registry path exists
+if (-not (Test-Path $registryPath)) {
+    # Create the registry path if it does not exist
+    New-Item -Path $registryPath -Force | Out-Null
+}
+ 
+# Set the registry key to the valid screensaver path
+Set-ItemProperty -Path $registryPath -Name $registryKey -Value $validScreensaverPath -Type String
+ 
+# Verify the change
+$currentValue = Get-ItemProperty -Path $registryPath -Name $registryKey -ErrorAction SilentlyContinue
+if ($currentValue.$registryKey -eq $validScreensaverPath) {
+    Write-Host "The '$registryKey' registry key has been set to '$validScreensaverPath'."
+} else {
+    Write-Host "Failed to set the '$registryKey' registry key."
+}
+
+######################################################Current list of Groups and User Accounts granted the 'Deny logon through terminal (Remote Desktop) service' right
+ 
+# Define the policy and groups
+$policy = "SeDenyRemoteInteractiveLogonRight"
+$groups = @("Guests", "Local account")
+ 
+# Get the current assignment of the policy
+$currentRights = (Get-WmiObject -Namespace root\cimv2 -Class Win32_UserRight | Where-Object { $_.Right -eq $policy }).Account
+ 
+# Add the groups to the policy if they are not already assigned
+foreach ($group in $groups) {
+    if ($currentRights -notcontains $group) {
+        # Assign the right to the group
+        $seceditPath = "$env:TEMP\secpol.inf"
+        secedit /export /cfg $seceditPath
+        (Get-Content $seceditPath) -replace "($policy\s*=.*)", "`$1,$group" | Set-Content $seceditPath
+        secedit /configure /db "$env:TEMP\secedit.sdb" /cfg $seceditPath
+        Write-Host "The '$policy' right has been assigned to the '$group' group."
+    } else {
+        Write-Host "The '$policy' right is already assigned to the '$group' group."
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
