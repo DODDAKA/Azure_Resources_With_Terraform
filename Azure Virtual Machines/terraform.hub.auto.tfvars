@@ -40,3 +40,13 @@ vms_hub ={
     }
     
 }
+
+
+###########Azure cache for redis#########
+
+  redis-name = "redis-cus-dev"
+  redis-capacity = 2
+  redis-tier = "C"
+  redis-sku_name = "Standard"
+  non_ssl_port_enabled = "false"
+  minimum_tls_version = "1.2"
