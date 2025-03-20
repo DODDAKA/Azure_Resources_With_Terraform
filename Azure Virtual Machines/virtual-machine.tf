@@ -54,8 +54,8 @@ resource "azurerm_linux_virtual_machine" "example" {
 source_image_reference {
   publisher = "RedHat"
   offer     = "RHEL"
-  sku       = "7.6"
-  version   = "latest"
+  sku       = "9_4"
+  version   = "9.3.2024050617"  #### latest
 }
 
 }

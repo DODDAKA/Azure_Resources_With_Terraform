@@ -24,7 +24,7 @@ terraform {
 provider "azurerm" {
   # Configuration options
   alias = "dev_env"
-  subscription_id = "01202567-6e50-4f04-b07a-77bb79f043f9"
+  subscription_id = "3ce0a1fd-a1bb-46f5-afcb-74b712009503"
 
   features {
 
